@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<title>切片</title>
+    <script src="https://cdn.bootcss.com/jquery/3.2.1/jquery.min.js"></script>
+	 <style>
+        .shangchuan{
+            background-color: rgba(204, 204, 204, 0.39);
+            width: 100%;
+            height: 100%;
+            position: fixed;
+            top:0px;
+            display: none;
+            z-index: 999;
+        }
+        #n a {
+            padding:0 4px;
+            color:#333
+        }
+        .Bar ,.Bars {
+            position: relative;
+            width: 200px;
+            /* 宽度 */
+            border: 1px solid #B1D632;
+            padding: 1px;
+        }
+        .Bar div,.Bars div {
+            display: block;
+            position: relative;
+            background:#00F;/* 进度条背景颜色 */
+            color: #333333;
+            height: 20px; /* 高度 */
+            line-height: 20px;
+            /* 必须和高度一致，文本才能垂直居中 */
+        }
+        .Bars div{
+            background:#090
+        }
+        .Bar div span,.Bars div span {
+            position: absolute;
+            width: 200px;
+            /* 宽度 */
+            text-align: center;
+            font-weight: bold;
+        }
+        .cent{
+            width:300px;
+            overflow:hidden;
+            position: fixed;
+            top:50px;
+        }
+    </style>
+</head>
+<body>
+<div class="shangchuan">
+        <div class="cent">
+        <p>
+            正在上传:
+        </p>
+        <p>
+            <div class="Bar">
+                <div id="jindutiao" style="width: 0%;">
+                    <span id="jindutiaoshuzhi">0%</span>
+                </div>
+            </div>
+        </p>
+    </div>
+</div>
+	文件上传<input type="file" id="file"/>
+	<button  onclick="sendRequest()">上传</button>
+</body>
+<script type="text/javascript">
+    var conneect=false;
+    const BYTES_PER_CHUNK = 1048576; // 每个文件切片大小定为1MB .
+    var slices;
+    var totalSlices;
+
+    //发送请求
+    function sendRequest() {
+            alert(conneect);
+        if(conneect){
+            return;
+        }
+        showJinDuTiao();
+        conneect=true;
+        var blob = document.getElementById('file').files[0];
+
+        var start = 0;
+        var end;
+        var index = 0;
+
+        // 计算文件切片总数
+        slices = Math.ceil(blob.size / BYTES_PER_CHUNK);
+        totalSlices= slices;
+
+        while(start < blob.size) {
+            end = start + BYTES_PER_CHUNK;
+            if(end > blob.size) {
+                end = blob.size;
+            }
+
+            uploadFile(blob, index, start, end);
+
+            start = end;
+            index++;
+        }
+    }
+
+    //上传文件
+    function uploadFile(blob, index, start, end) {
+        var xhr;
+        var fd;
+        var chunk;
+
+        xhr = new XMLHttpRequest();
+        xhr.onreadystatechange = function() {
+            if(xhr.readyState == 4) {
+                if(xhr.responseText) {
+                    alert(xhr.responseText);
+                }
+
+                slices--;
+
+                // 这一段是一个计算并显示进度条的
+                var jindu = (totalSlices-slices)/totalSlices*100;
+                $('#jindutiao').width(jindu*2+'px');
+                $('#jindutiaoshuzhi').html(Math.ceil(jindu)+'%');
+
+                // 如果所有文件切片都成功发送，发送文件合并请求。
+                if(slices == 0) {
+                    mergeFile(blob);
+                    alert('文件上传完毕');
+                    hideJinDuTiao();
+                    conneect = false;
+                }
+            }
+        };
+
+
+        chunk =blob.slice(start,end);//切割文件
+
+        //构造form数据
+        fd = new FormData();
+        fd.append("file", chunk);
+        fd.append("name", blob.name);
+        fd.append("index", index);
+
+        xhr.open("POST", "upload.php", true);
+
+        //设置二进制文边界件头
+        xhr.setRequestHeader("X_Requested_With", location.href.split("/")[3].replace(/[^a-z]+/g, '$'));
+        xhr.send(fd);
+    }
+//合并文件
+    function mergeFile(blob) {
+        var xhr;
+        var fd;
+
+        xhr = new XMLHttpRequest();
+
+        fd = new FormData();
+        fd.append("name", blob.name);
+        fd.append("index", totalSlices);
+
+        xhr.open("POST", "merge.php", true);
+        xhr.setRequestHeader("X_Requested_With", location.href.split("/")[3].replace(/[^a-z]+/g, '$'));
+        xhr.send(fd);
+    }
+
+</script>
+<script>
+	function showJinDuTiao() {
+        $('.shangchuan').show();
+    }
+    function hideJinDuTiao() {
+        $('.shangchuan').hide('slow');
+    }
+</script>
+</html>
